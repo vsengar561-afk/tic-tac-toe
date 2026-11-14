@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe Arena</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:Arial,Helvetica,sans-serif;color:#f8fafc;
+    background:radial-gradient(circle at top,#243b70 0,#10172d 48%,#090e1d 100%);
+    display:flex;align-items:center;justify-content:center;padding:22px}
+  .app{width:min(100%,520px);background:rgba(18,27,51,.94);border:1px solid #344568;
+    border-radius:24px;padding:28px;box-shadow:0 22px 70px #0008;text-align:center}
+  h1{margin:0 0 8px;font-size:clamp(2rem,7vw,3rem);letter-spacing:1px}
+  .sub{color:#aebbd5;margin:0 0 24px}
+  .screen{display:none}.screen.active{display:block}
+  .choices{display:grid;gap:12px;margin-top:22px}
+  button{font:inherit;cursor:pointer;border:0;border-radius:13px;padding:14px 18px;font-weight:700;
+    transition:transform .15s,filter .15s}
+  button:hover{filter:brightness(1.12);transform:translateY(-2px)}
+  button:focus-visible{outline:3px solid white;outline-offset:3px}
+  .primary{background:#6c8cff;color:#08132e}
+  .secondary{background:#263858;color:#eef4ff;border:1px solid #48618d}
+  .easy{background:#36c98a;color:#062719}.medium{background:#f4bd4f;color:#332100}
+  .hard{background:#ff6b79;color:#34070c}
+  .topline{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:6px 0 18px}
+  .pill{background:#263858;color:#dce7ff;padding:8px 12px;border-radius:99px;font-size:.9rem}
+  .status{min-height:30px;font-size:1.1rem;font-weight:700;margin:12px 0 18px}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(100%,360px);margin:0 auto 20px}
+  .cell{aspect-ratio:1;background:#253657;border:1px solid #41577e;border-radius:16px;
+    color:white;font-size:clamp(2.8rem,13vw,4.5rem);font-weight:800;padding:0}
+  .cell.x{color:#77a0ff}.cell.o{color:#55dfb0}
+  .cell:disabled{cursor:default;transform:none;filter:none}
+  .actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .actions button{padding:11px 15px}
+  .note{color:#9eacc8;font-size:.86rem;line-height:1.5;margin-top:18px}
+  .hidden{display:none!important}
+  @media(max-width:420px){.app{padding:20px}.topline{font-size:.9rem}}
+</style>
+</head>
+<body>
+<main class="app">
+  <h1>❎ Tic Tac Toe ⭕</h1>
+  <p class="sub">Choose your opponent and start the challenge.</p>
+
+  <section id="home" class="screen active">
+    <h2>Who do you want to play?</h2>
+    <div class="choices">
+      <button class="primary" onclick="chooseMode('bot')">🤖 Play with bot</button>
+      <button class="secondary" onclick="chooseMode('friend')">👥 Play with friend</button>
+    </div>
+  </section>
+
+  <section id="difficulty" class="screen">
+    <h2>Choose your difficulty</h2>
+    <p class="sub">Each difficulty has 100 levels. Win to unlock the next level!</p>
+    <div class="choices">
+      <button class="easy" onclick="startBot('easy')">Easy</button>
+      <button class="medium" onclick="startBot('medium')">Medium</button>
+      <button class="hard" onclick="startBot('hard')">Hard</button>
+      <button class="secondary" onclick="showScreen('home')">← Back</button>
+    </div>
+  </section>
+
+  <section id="game" class="screen">
+    <div class="topline">
+      <span id="modeLabel" class="pill">Play</span>
+      <span id="levelLabel" class="pill">Level 1 / 100</span>
+    </div>
+    <div id="status" class="status">Your turn!</div>
+    <div id="board" class="board" aria-label="Tic tac toe board">
+      <button class="cell" aria-label="Top left" onclick="play(0)"></button>
+      <button class="cell" aria-label="Top middle" onclick="play(1)"></button>
+      <button class="cell" aria-label="Top right" onclick="play(2)"></button>
+      <button class="cell" aria-label="Middle left" onclick="play(3)"></button>
+      <button class="cell" aria-label="Center" onclick="play(4)"></button>
+      <button class="cell" aria-label="Middle right" onclick="play(5)"></button>
+      <button class="cell" aria-label="Bottom left" onclick="play(6)"></button>
+      <button class="cell" aria-label="Bottom middle" onclick="play(7)"></button>
+      <button class="cell" aria-label="Bottom right" onclick="play(8)"></button>
+    </div>
+    <div class="actions">
+      <button class="primary" onclick="newRound()">↻ New round</button>
+      <button class="secondary" onclick="backToMenu()">Menu</button>
+    </div>
+    <p class="note" id="helpText">You are X. The bot is O.</p>
+  </section>
+</main>
+
+<script>
+const screens = ["home","difficulty","game"];
+let mode = "bot", difficulty = "easy", level = 1;
+let cells = Array(9).fill(""), turn = "X", active = false, botThinking = false;
+let roundOver = false;
+const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+function showScreen(id){
+  screens.forEach(s => document.getElementById(s).classList.toggle("active",s===id));
+}
+function chooseMode(selected){
+  mode = selected;
+  if(mode === "bot") showScreen("difficulty");
+  else { level = 1; showScreen("game"); newRound(); }
+}
+function startBot(which){
+  mode = "bot"; difficulty = which; level = 1;
+  showScreen("game"); newRound();
+}
+function backToMenu(){ active=false; botThinking=false; showScreen("home"); }
+function newRound(){
+  cells = Array(9).fill(""); turn = "X"; active = true; botThinking = false; roundOver = false;
+  document.getElementById("modeLabel").textContent = mode === "bot" ? `🤖 ${cap(difficulty)} bot` : "👥 Two players";
+  document.getElementById("levelLabel").textContent = mode === "bot" ? `Level ${level} / 100` : "Friend match";
+  document.getElementById("helpText").textContent = mode === "bot" ? "You are X. The bot is O." : "Player X starts. Take turns with your friend.";
+  document.getElementById("status").textContent = mode === "bot" ? "Your turn — you are X!" : "Player X's turn!";
+  render();
+}
+function cap(s){return s[0].toUpperCase()+s.slice(1)}
+function render(){
+  document.querySelectorAll(".cell").forEach((b,i)=>{
+    b.textContent = cells[i];
+    b.className = "cell" + (cells[i] ? " "+cells[i].toLowerCase() : "");
+    b.disabled = !active || !!cells[i] || botThinking || (mode==="bot" && turn==="O");
+  });
+}
+function winner(board){
+  for(const line of wins){
+    const [a,b,c]=line;
+    if(board[a] && board[a]===board[b] && board[a]===board[c]) return board[a];
+  }
+  return board.every(Boolean) ? "draw" : null;
+}
+function play(i){
+  if(!active || cells[i] || botThinking) return;
+  cells[i] = turn;
+  afterMove();
+  if(active && mode==="bot" && turn==="O") {
+    botThinking=true; render();
+    setTimeout(()=>{
+      if(!active) return;
+      const move = botMove();
+      if(move !== undefined) cells[move]="O";
+      botThinking=false; afterMove();
+    },420);
+  }
+}
+function afterMove(){
+  const result=winner(cells);
+  if(result){
+    active=false; roundOver=true;
+    if(result==="draw") document.getElementById("status").textContent="It's a draw! Try again.";
+    else if(mode==="bot" && result==="X"){
+      document.getElementById("status").textContent = level===100 ? "🏆 You completed all 100 levels!" : `🎉 You won! Level ${level} completed.`;
+      if(level<100) level++;
+      document.getElementById("levelLabel").textContent=`Level ${Math.min(level,100)} / 100`;
+    } else if(mode==="bot") document.getElementById("status").textContent="The bot won this round. Try again!";
+    else document.getElementById("status").textContent=`Player ${result} wins!`;
+  } else {
+    turn = turn==="X" ? "O" : "X";
+    document.getElementById("status").textContent = mode==="bot" ? (turn==="X" ? "Your turn!" : "Bot is thinking…") : `Player ${turn}'s turn!`;
+  }
+  render();
+}
+function botMove(){
+  const available=cells.map((v,i)=>v===""?i:-1).filter(i=>i!==-1);
+  if(!available.length) return;
+  const skill = skillForLevel();
+  // The bot looks for a winning move and a block. Lower skill levels sometimes miss tactics.
+  const winning = tacticalMove("O");
+  const blocking = tacticalMove("X");
+  const tacticalChance = skill;
+  if(winning!==undefined && Math.random()<tacticalChance) return winning;
+  if(blocking!==undefined && Math.random()<tacticalChance) return blocking;
+  if(difficulty==="hard" && level>=85) return minimaxChoice();
+  if(difficulty==="hard" && level>=45 && Math.random()<0.65) return minimaxChoice();
+  if(difficulty==="medium" && level>=65 && Math.random()<0.5) return minimaxChoice();
+  if(Math.random()<skill*0.65) {
+    if(!cells[4]) return 4;
+    const corners=[0,2,6,8].filter(i=>!cells[i]);
+    if(corners.length) return corners[Math.floor(Math.random()*corners.length)];
+  }
+  return available[Math.floor(Math.random()*available.length)];
+}
+function skillForLevel(){
+  const progress=(level-1)/99;
+  if(difficulty==="easy") return 0.12 + progress*0.43;
+  if(difficulty==="medium") return 0.42 + progress*0.43;
+  return 0.72 + progress*0.28;
+}
+function tacticalMove(mark){
+  for(const i of cells.map((v,i)=>v===""?i:-1).filter(i=>i!==-1)){
+    const copy=cells.slice(); copy[i]=mark;
+    if(winner(copy)===mark) return i;
+  }
+  return undefined;
+}
+function minimaxChoice(){
+  let best=-Infinity, move;
+  for(const i of cells.map((v,i)=>v===""?i:-1).filter(i=>i!==-1)){
+    cells[i]="O";
+    const score=minimax(cells,false,0);
+    cells[i]="";
+    if(score>best){best=score;move=i;}
+  }
+  return move;
+}
+function minimax(board,isMax,depth){
+  const result=winner(board);
+  if(result==="O") return 10-depth;
+  if(result==="X") return depth-10;
+  if(result==="draw") return 0;
+  let best=isMax?-Infinity:Infinity;
+  for(let i=0;i<9;i++) if(!board[i]){
+    board[i]=isMax?"O":"X";
+    const score=minimax(board,!isMax,depth+1);
+    board[i]="";
+    best=isMax?Math.max(best,score):Math.min(best,score);
+  }
+  return best;
+}
+</script>
+</body>
+</html>
